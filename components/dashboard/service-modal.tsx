@@ -1,12 +1,13 @@
+// components/dashboard/service-modal.tsx
 'use client'
 
-import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
+import { useState, useEffect } from 'react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface Service {
   id: string
@@ -22,95 +23,112 @@ interface ServiceModalProps {
   isOpen: boolean
   onClose: () => void
   service?: Service | null
-  mode: "create" | "edit"
+  mode: 'create' | 'edit'
 }
 
+const serviceCategories = [
+  'Corte de Pelo',
+  'Barba',
+  'Tinte',
+  'Tratamiento',
+  'Masaje',
+  'Facial',
+  'Manicure',
+  'Pedicure',
+  'Depilación',
+  'Otro'
+]
+
 export function ServiceModal({ isOpen, onClose, service, mode }: ServiceModalProps) {
+  const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    name: "",
-    description: "",
+    name: '',
+    description: '',
     duration: 30,
     price: 0,
-    isActive: true,
-    category: ""
+    category: '',
+    isActive: true
   })
 
-  const categories = ["Cortes", "Barba", "Coloración", "Tratamientos", "Combos", "Otros"]
-
   useEffect(() => {
-    if (mode === "edit" && service) {
+    if (service && mode === 'edit') {
       setFormData({
         name: service.name,
         description: service.description,
         duration: service.duration,
         price: service.price,
-        isActive: service.isActive,
-        category: service.category
+        category: service.category,
+        isActive: service.isActive
       })
     } else {
       setFormData({
-        name: "",
-        description: "",
+        name: '',
+        description: '',
         duration: 30,
         price: 0,
-        isActive: true,
-        category: ""
+        category: '',
+        isActive: true
       })
     }
-  }, [mode, service, isOpen])
+  }, [service, mode, isOpen])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Datos del servicio:", formData)
-    onClose()
-  }
+    setLoading(true)
 
-  const handlePriceChange = (value: string) => {
-    const numericValue = value.replace(/\D/g, "")
-    setFormData({ ...formData, price: numericValue ? parseInt(numericValue) : 0 })
-  }
+    try {
+      const url = mode === 'create' ? '/api/services' : `/api/services/${service?.id}`
+      const method = mode === 'create' ? 'POST' : 'PUT'
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("es-CL").format(price)
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      })
+
+      if (response.ok) {
+        onClose()
+        // Recargar la página para actualizar la lista
+        window.location.reload()
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Error al guardar el servicio')
+      }
+    } catch (error) {
+      console.error('Error saving service:', error)
+      alert('Error al guardar el servicio')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {mode === "create" ? "Crear Nuevo Servicio" : "Editar Servicio"}
+            {mode === 'create' ? 'Crear Nuevo Servicio' : 'Editar Servicio'}
           </DialogTitle>
+          <DialogDescription>
+            {mode === 'create' 
+              ? 'Agrega un nuevo servicio a tu catálogo' 
+              : 'Modifica la información del servicio'
+            }
+          </DialogDescription>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nombre del Servicio *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ej: Corte de Cabello"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="category">Categoría *</Label>
-              <select
-                id="category"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
-                required
-              >
-                <option value="">Selecciona una categoría</option>
-                {categories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Nombre del Servicio *</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Ej: Corte de Pelo Clásico"
+              required
+            />
           </div>
 
           <div className="space-y-2">
@@ -119,7 +137,7 @@ export function ServiceModal({ isOpen, onClose, service, mode }: ServiceModalPro
               id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Describe el servicio para tus clientes..."
+              placeholder="Describe el servicio..."
               rows={3}
             />
           </div>
@@ -130,47 +148,60 @@ export function ServiceModal({ isOpen, onClose, service, mode }: ServiceModalPro
               <Input
                 id="duration"
                 type="number"
-                min="5"
-                max="240"
-                step="5"
                 value={formData.duration}
                 onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) || 0 })}
+                min="5"
+                max="480"
                 required
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="price">Precio (CLP) *</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-2.5 text-slate-500">$</span>
-                <Input
-                  id="price"
-                  value={formatPrice(formData.price)}
-                  onChange={(e) => handlePriceChange(e.target.value)}
-                  className="pl-8"
-                  placeholder="0"
-                  required
-                />
-              </div>
+              <Input
+                id="price"
+                type="number"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })}
+                min="0"
+                required
+              />
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Switch
-              checked={formData.isActive}
-              onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
-            />
-            <Label htmlFor="active">Servicio activo</Label>
+          <div className="space-y-2">
+            <Label htmlFor="category">Categoría</Label>
+            <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona una categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                {serviceCategories.map(category => (
+                  <SelectItem key={category} value={category}>{category}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <DialogFooter>
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="isActive"
+              checked={formData.isActive}
+              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+              className="rounded border-slate-300"
+            />
+            <Label htmlFor="isActive">Servicio activo (disponible para booking)</Label>
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit">
-              {mode === "create" ? "Crear Servicio" : "Guardar Cambios"}
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Guardando...' : mode === 'create' ? 'Crear Servicio' : 'Guardar Cambios'}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

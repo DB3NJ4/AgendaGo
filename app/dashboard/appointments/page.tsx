@@ -1,4 +1,4 @@
-// app/dashboard/appointments/page.tsx
+// app/dashboard/appointments/page.tsx (actualizado)
 'use client'
 
 import { useState } from 'react'
@@ -40,49 +40,6 @@ export default function AppointmentsPage() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Citas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-slate-600">Este mes</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Confirmadas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">10</div>
-            <p className="text-xs text-slate-600">Citas activas</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">2</div>
-            <p className="text-xs text-slate-600">Por confirmar</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Canceladas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">0</div>
-            <p className="text-xs text-slate-600">Este mes</p>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Tabs para diferentes vistas */}
       <Tabs defaultValue="calendar" className="space-y-4">
         <TabsList>
@@ -97,17 +54,7 @@ export default function AppointmentsPage() {
         </TabsList>
 
         <TabsContent value="calendar" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Calendario de Citas</CardTitle>
-              <CardDescription>
-                Haz clic en cualquier fecha para agendar una nueva cita
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AppointmentCalendar />
-            </CardContent>
-          </Card>
+          <AppointmentCalendar />
         </TabsContent>
 
         <TabsContent value="list" className="space-y-4">

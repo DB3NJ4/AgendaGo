@@ -1,4 +1,3 @@
-'EOF'
 // prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
@@ -31,6 +30,9 @@ model Business {
   address     String?
   phone       String?
   email       String?
+  timezone    String   @default("America/Santiago")
+  bookingLeadTime Int  @default(60)
+  cancellationPolicy Int @default(24)
   category    String?
   logo        String?
   coverImage  String?
@@ -118,4 +120,3 @@ model Subscription {
 
   @@map("subscriptions")
 }
-EOF

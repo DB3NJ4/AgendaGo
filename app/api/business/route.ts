@@ -1,133 +1,125 @@
+// app/api/business/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { currentUser } from '@clerk/nextjs/server'
-import { mockDb } from '@/lib/mock-db'
+import { getAuth } from '@clerk/nextjs/server'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await currentUser()
+    const { userId } = getAuth(request)
     
-    if (!user) {
+    console.log('🔐 User ID from auth:', userId)
+
+    if (!userId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const body = await request.json()
-    const { name, slug, description, address, phone, email, category } = body
+    const { name, slug, description, category, phone, address, email } = body
 
-    // Validaciones
-    if (!name || !slug) {
-      return NextResponse.json({ error: 'Nombre y slug son requeridos' }, { status: 400 })
-    }
+    console.log('📝 Datos recibidos del frontend:', body)
 
-    // Verificar si el usuario ya existe
-    let dbUser = await mockDb.user.findUnique({
-      where: { clerkId: user.id }
+    // Buscar o CREAR usuario en nuestra DB
+    let dbUser = await prisma.user.findUnique({
+      where: { clerkId: userId }
     })
 
-    // Si no existe, crearlo
     if (!dbUser) {
-      dbUser = await mockDb.user.create({
+      console.log('👤 Usuario no encontrado, creando nuevo usuario...')
+      
+      // Para obtener más información del usuario de Clerk, podrías necesitar la API de Clerk
+      // Por ahora creamos con los datos básicos
+      dbUser = await prisma.user.create({
         data: {
-          clerkId: user.id,
-          email: user.emailAddresses[0].emailAddress,
-          firstName: user.firstName,
-          lastName: user.lastName
+          clerkId: userId,
+          email: email || `user-${userId}@temp.com`, // Usar email del form o temporal
+          firstName: '', // Podrías obtener esto de Clerk si está disponible
+          lastName: ''
         }
       })
+      console.log('✅ Usuario creado:', dbUser.id)
+    } else {
+      console.log('👤 Usuario encontrado en DB:', dbUser.id)
     }
 
-    // Verificar si el slug ya está en uso
-    const existingBusiness = await mockDb.business.findUnique({
+    // Verificar si el slug ya existe
+    const existingBusiness = await prisma.business.findUnique({
       where: { slug }
     })
 
     if (existingBusiness) {
-      return NextResponse.json({ error: 'Esta URL ya está en uso' }, { status: 400 })
+      console.log('❌ Slug ya existe:', slug)
+      return NextResponse.json(
+        { error: 'Esta URL ya está en uso. Por favor elige otra.' }, 
+        { status: 400 }
+      )
     }
 
+    console.log('✅ Slug disponible:', slug)
+
     // Crear el negocio
-    const business = await mockDb.business.create({
+    const business = await prisma.business.create({
       data: {
         name,
         slug,
-        description,
-        address,
-        phone,
-        email: email || user.emailAddresses[0].emailAddress,
-        category,
-        isActive: true,
-        userId: dbUser.id
-      }
-    })
-
-    // Crear horarios por defecto
-    const defaultHours = [
-      { dayOfWeek: 1, openTime: '09:00', closeTime: '18:00' },
-      { dayOfWeek: 2, openTime: '09:00', closeTime: '18:00' },
-      { dayOfWeek: 3, openTime: '09:00', closeTime: '18:00' },
-      { dayOfWeek: 4, openTime: '09:00', closeTime: '18:00' },
-      { dayOfWeek: 5, openTime: '09:00', closeTime: '18:00' },
-      { dayOfWeek: 6, openTime: '10:00', closeTime: '14:00' },
-      { dayOfWeek: 0, isClosed: true }
-    ]
-
-    await mockDb.businessHours.createMany({
-      data: defaultHours.map(hours => ({
-        ...hours,
-        businessId: business.id
-      }))
-    })
-
-    // Crear suscripción básica
-    await mockDb.subscription.create({
-      data: {
-        plan: 'basic',
-        status: 'active',
-        price: 5000,
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        cancelAtPeriodEnd: false,
-        businessId: business.id
-      }
-    })
-
-    // Crear servicios por defecto
-    const defaultServices = [
-      {
-        name: 'Corte de Cabello',
-        description: 'Corte moderno y personalizado',
-        duration: 30,
-        price: 15000,
-        category: 'Cortes',
-        isActive: true,
-        businessId: business.id
+        description: description || '',
+        category: category || 'general',
+        phone: phone || '',
+        address: address || '',
+        email: email || null,
+        userId: dbUser.id,
+        // Crear horarios por defecto
+        businessHours: {
+          create: [
+            { dayOfWeek: 1, openTime: '09:00', closeTime: '18:00' }, // Lunes
+            { dayOfWeek: 2, openTime: '09:00', closeTime: '18:00' }, // Martes
+            { dayOfWeek: 3, openTime: '09:00', closeTime: '18:00' }, // Miércoles
+            { dayOfWeek: 4, openTime: '09:00', closeTime: '18:00' }, // Jueves
+            { dayOfWeek: 5, openTime: '09:00', closeTime: '18:00' }, // Viernes
+            { dayOfWeek: 6, openTime: '09:00', closeTime: '14:00' }, // Sábado
+            { dayOfWeek: 0, isClosed: true } // Domingo
+          ]
+        }
       },
-      {
-        name: 'Arreglo de Barba',
-        description: 'Afeitado y diseño de barba',
-        duration: 20,
-        price: 8000,
-        category: 'Barba',
-        isActive: true,
-        businessId: business.id
+      include: {
+        businessHours: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
       }
-    ]
+    })
 
-    for (const serviceData of defaultServices) {
-      await mockDb.service.create({
-        data: serviceData
-      })
-    }
+    console.log('✅ Negocio creado exitosamente!')
+    console.log('🏢 ID:', business.id)
+    console.log('🏢 Nombre:', business.name)
+    console.log('🏢 Slug:', business.slug)
+    console.log('🏢 Horarios creados:', business.businessHours.length)
 
     return NextResponse.json({ 
       success: true, 
-      business,
-      message: 'Negocio creado exitosamente' 
+      business: {
+        id: business.id,
+        name: business.name,
+        slug: business.slug,
+        description: business.description,
+        category: business.category,
+        phone: business.phone,
+        address: business.address,
+        email: business.email
+      },
+      message: 'Negocio creado exitosamente'
     })
 
   } catch (error) {
-    console.error('Error creando negocio:', error)
+    console.error('❌ Error creando negocio:', error)
     return NextResponse.json(
-      { error: 'Error interno del servidor' }, 
+      { 
+        error: 'Error interno del servidor',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 
       { status: 500 }
     )
   }

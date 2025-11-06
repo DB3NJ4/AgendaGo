@@ -1,3 +1,4 @@
+// app/dashboard/page.tsx
 import { currentUser } from '@clerk/nextjs/server'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -5,27 +6,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { Calendar, Users, DollarSign, TrendingUp, Plus, Clock, ArrowRight, CreditCard } from 'lucide-react'
-
-// Mock data - se usarán si no hay datos reales
-const mockBusinessStats = {
-  totalAppointments: 12,
-  upcomingAppointments: 3,
-  monthlyRevenue: 184000,
-  newCustomers: 5
-}
-
-const upcomingAppointments = [
-  { id: '1', customer: 'Juan Pérez', service: 'Corte de Pelo', time: 'Hoy 10:00 AM' },
-  { id: '2', customer: 'María González', service: 'Arreglo de Barba', time: 'Hoy 2:00 PM' },
-  { id: '3', customer: 'Carlos López', service: 'Corte y Barba', time: 'Mañana 11:00 AM' }
-]
-
-// Función para obtener estadísticas del negocio (mock por ahora)
-async function getBusinessStats(businessId: string) {
-  // Aquí iría la llamada real a la base de datos
-  return mockBusinessStats
-}
+import { 
+  Calendar, 
+  Users, 
+  DollarSign, 
+  Plus, 
+  Clock, 
+  CreditCard, 
+  Settings,
+  BarChart3,
+  Phone,
+  CheckCircle,
+  Globe,
+  TrendingUp,
+  Eye
+} from 'lucide-react'
+import { CopyLinkButton } from '@/components/copy-link-button'
+import { DashboardStats } from '@/components/dashboard/dashboard-stats'
+import { UpcomingAppointments } from '@/components/dashboard/upcoming-appointments'
+import { RecentActivity } from '@/components/dashboard/recent-activity'
 
 export default async function DashboardPage() {
   const user = await currentUser()
@@ -34,11 +33,10 @@ export default async function DashboardPage() {
     redirect('/sign-in')
   }
 
-  let hasBusiness = false
-  let business = null
-  let businessStats = mockBusinessStats
+  let businessData = null
+  let statsData = null
+  let upcomingAppointments = []
 
-  // Verificar si el usuario tiene negocio en la base de datos
   try {
     const headersList = await headers()
     
@@ -46,203 +44,203 @@ export default async function DashboardPage() {
       headers: {
         'Cookie': headersList.get('cookie') || ''
       },
-      cache: 'no-store' // Para evitar cache en desarrollo
+      cache: 'no-store'
     })
     
-    if (response.ok) {
-      const data = await response.json()
-      hasBusiness = data.hasBusiness
-      business = data.business
-      
-      if (hasBusiness && business) {
-        // Usar datos reales del negocio
-        businessStats = await getBusinessStats(business.id)
-      } else {
-        redirect('/onboarding')
-      }
-    } else {
-      console.error('Error en la respuesta:', response.status)
+    console.log('📊 Dashboard - Status:', response.status)
+    
+    const data = await response.json()
+    console.log('📊 Dashboard - Data recibida:', data)
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`)
+    }
+    
+    if (!data.hasBusiness || !data.business) {
+      console.log('🚨 No business found in API response')
       redirect('/onboarding')
     }
     
+    businessData = data.business
+
+    // Obtener estadísticas
+    const statsResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/dashboard/stats`, {
+      headers: {
+        'Cookie': headersList.get('cookie') || ''
+      },
+      cache: 'no-store'
+    })
+
+    if (statsResponse.ok) {
+      const stats = await statsResponse.json()
+      statsData = stats
+    }
+
+    // Obtener próximas citas
+    const appointmentsResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/dashboard/appointments`, {
+      headers: {
+        'Cookie': headersList.get('cookie') || ''
+      },
+      cache: 'no-store'
+    })
+
+    if (appointmentsResponse.ok) {
+      const appointments = await appointmentsResponse.json()
+      upcomingAppointments = appointments.appointments || []
+    }
+    
   } catch (error) {
-    console.error('Error verificando negocio:', error)
+    console.error('❌ Error cargando dashboard:', error)
     redirect('/onboarding')
   }
 
+  const businessUrl = `${process.env.NEXT_PUBLIC_APP_URL}/${businessData.slug}`
+
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
+      {/* Header con verificación */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">
-            Hola, {user.firstName || 'Usuario'} 👋
-          </h1>
-          <p className="text-slate-600 mt-2">
-            Bienvenido a tu panel de AgendaGo
+          <div className="flex items-center space-x-2 mb-2">
+            <CheckCircle className="h-6 w-6 text-green-500" />
+            <h1 className="text-3xl font-bold text-slate-900">
+              ¡Hola, {user.firstName || 'Usuario'}! 🎉
+            </h1>
+          </div>
+          <p className="text-slate-600">
+            Bienvenido al panel de <strong>{businessData.name}</strong>
           </p>
+          <Badge variant="outline" className="mt-2 bg-green-50 text-green-700">
+            ✅ Negocio activo
+          </Badge>
         </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva Cita
-        </Button>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Citas</CardTitle>
-            <Calendar className="h-4 w-4 text-slate-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{businessStats.totalAppointments}</div>
-            <p className="text-xs text-slate-600">+2 desde la semana pasada</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Próximas Citas</CardTitle>
-            <Clock className="h-4 w-4 text-slate-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{businessStats.upcomingAppointments}</div>
-            <p className="text-xs text-slate-600">Para hoy y mañana</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ingresos Mensuales</CardTitle>
-            <DollarSign className="h-4 w-4 text-slate-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${businessStats.monthlyRevenue.toLocaleString()}</div>
-            <p className="text-xs text-slate-600">+12% desde el mes pasado</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Nuevos Clientes</CardTitle>
-            <Users className="h-4 w-4 text-slate-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{businessStats.newCustomers}</div>
-            <p className="text-xs text-slate-600">Este mes</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Info de Suscripción */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Tu Suscripción</span>
-            <Badge variant="outline">Básico</Badge>
-          </CardTitle>
-          <CardDescription>
-            Gestiona tu plan y método de pago
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold">Plan Básico - $5.000/mes</p>
-              <p className="text-sm text-slate-600">Renovación: 15 Dic 2024</p>
-            </div>
-            <Button asChild>
-              <Link href="/dashboard/billing">
-                <CreditCard className="mr-2 h-4 w-4" />
-                Gestionar Suscripción
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions & Upcoming Appointments */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Acciones Rápidas</CardTitle>
-            <CardDescription>Gestiona tu negocio rápidamente</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button className="w-full justify-start" variant="outline">
+        <div className="flex space-x-3">
+          <Button asChild variant="outline">
+            <Link href={`/${businessData.slug}`} target="_blank">
+              <Eye className="mr-2 h-4 w-4" />
+              Ver Mi Página
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/dashboard/appointments/new">
               <Plus className="mr-2 h-4 w-4" />
-              Agregar Servicio
-            </Button>
-            <Button className="w-full justify-start" variant="outline">
-              <Calendar className="mr-2 h-4 w-4" />
-              Ver Calendario Completo
-            </Button>
-            <Button className="w-full justify-start" variant="outline">
-              <Users className="mr-2 h-4 w-4" />
-              Gestionar Clientes
-            </Button>
-            <Button className="w-full justify-start" variant="outline">
-              <DollarSign className="mr-2 h-4 w-4" />
-              Ver Reportes de Ingresos
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Upcoming Appointments */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Próximas Citas</CardTitle>
-            <CardDescription>Tus citas programadas para hoy y mañana</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {upcomingAppointments.map((appointment) => (
-                <div key={appointment.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <h3 className="font-semibold">{appointment.customer}</h3>
-                    <p className="text-sm text-slate-600">{appointment.service}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-sm">{appointment.time}</p>
-                    <Button variant="ghost" size="sm" className="mt-1">
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <Button variant="outline" className="w-full mt-4">
-              Ver Todas las Citas
-            </Button>
-          </CardContent>
-        </Card>
+              Nueva Cita
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {/* Business URL Card */}
-      <Card className="bg-gradient-to-r from-slate-900 to-slate-700 text-white">
-        <CardHeader>
-          <CardTitle>Tu Página Web</CardTitle>
-          <CardDescription className="text-slate-300">
-            Comparte este enlace con tus clientes para que reserven citas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xl font-mono">agendago.cl/mi-negocio</p>
-              <p className="text-slate-300 text-sm mt-1">
-                Los clientes pueden ver tus servicios y reservar citas 24/7
-              </p>
-            </div>
-            <Button variant="secondary">
-              Copiar Enlace
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Estadísticas en Tiempo Real */}
+      <DashboardStats stats={statsData} />
+
+      {/* Grid Principal */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Columna Izquierda - Próximas Citas y Actividad Reciente */}
+        <div className="lg:col-span-2 space-y-6">
+          <UpcomingAppointments appointments={upcomingAppointments} />
+          <RecentActivity businessId={businessData.id} />
+        </div>
+
+        {/* Columna Derecha - Información del Negocio y Acciones Rápidas */}
+        <div className="space-y-6">
+          {/* Información del Negocio */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Tu Negocio</span>
+                <Badge variant="outline">{businessData.category}</Badge>
+              </CardTitle>
+              <CardDescription>
+                Información de tu negocio en AgendaGo
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div>
+                  <h4 className="font-semibold text-sm text-slate-500">Nombre</h4>
+                  <p className="font-medium">{businessData.name}</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-sm text-slate-500">Categoría</h4>
+                  <p className="font-medium">{businessData.category}</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-sm text-slate-500">Teléfono</h4>
+                  <p className="font-medium">{businessData.phone}</p>
+                </div>
+                {businessData.address && (
+                  <div>
+                    <h4 className="font-semibold text-sm text-slate-500">Dirección</h4>
+                    <p className="font-medium">{businessData.address}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Business URL Card */}
+          <Card className="bg-gradient-to-r from-slate-900 to-slate-700 text-white">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Globe className="mr-2 h-5 w-5" />
+                Tu Página Web Pública
+              </CardTitle>
+              <CardDescription className="text-slate-300">
+                Comparte este enlace con tus clientes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex-1">
+                  <p className="text-xl font-mono bg-slate-800 px-3 py-2 rounded">
+                    {businessUrl.replace('http://', '')}
+                  </p>
+                  <p className="text-slate-300 text-sm mt-2">
+                    Los clientes pueden ver tus servicios y reservar citas 24/7
+                  </p>
+                </div>
+                <CopyLinkButton url={businessUrl} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Acciones Rápidas</CardTitle>
+              <CardDescription>Gestiona tu negocio rápidamente</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <Button asChild className="w-full justify-start" variant="outline">
+                  <Link href="/dashboard/services">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Gestionar Servicios
+                  </Link>
+                </Button>
+                <Button asChild className="w-full justify-start" variant="outline">
+                  <Link href="/dashboard/appointments">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    Ver Calendario
+                  </Link>
+                </Button>
+                <Button asChild className="w-full justify-start" variant="outline">
+                  <Link href="/dashboard/customers">
+                    <Users className="mr-2 h-4 w-4" />
+                    Ver Clientes
+                  </Link>
+                </Button>
+                <Button asChild className="w-full justify-start" variant="outline">
+                  <Link href="/dashboard/settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Configuración
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,17 +1,11 @@
+// components/dashboard/services-list.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { MoreHorizontal, Plus, Clock, DollarSign, Search, Filter } from 'lucide-react'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { Edit, Trash2, Clock, DollarSign } from 'lucide-react'
 
 interface Service {
   id: string
@@ -23,190 +17,147 @@ interface Service {
   category: string
 }
 
-const mockServices: Service[] = [
-  {
-    id: '1',
-    name: 'Corte de Cabello',
-    description: 'Corte moderno y personalizado',
-    duration: 30,
-    price: 15000,
-    isActive: true,
-    category: 'Cortes'
-  },
-  {
-    id: '2',
-    name: 'Arreglo de Barba',
-    description: 'Afeitado y diseño de barba',
-    duration: 20,
-    price: 8000,
-    isActive: true,
-    category: 'Barba'
-  },
-  {
-    id: '3',
-    name: 'Corte + Barba',
-    description: 'Combo completo de corte y arreglo de barba',
-    duration: 45,
-    price: 20000,
-    isActive: true,
-    category: 'Combos'
-  },
-  {
-    id: '4',
-    name: 'Afeitado Clásico',
-    description: 'Afeitado tradicional con navaja',
-    duration: 25,
-    price: 12000,
-    isActive: false,
-    category: 'Barba'
-  }
-]
+interface ServicesListProps {
+  onEditService?: (service: Service) => void
+}
 
-export function ServicesList() {
-  const [services, setServices] = useState<Service[]>(mockServices)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterCategory, setFilterCategory] = useState('all')
+export function ServicesList({ onEditService }: ServicesListProps) {
+  const [services, setServices] = useState<Service[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const categories = ['all', ...new Set(mockServices.map(service => service.category))]
+  useEffect(() => {
+    fetchServices()
+  }, [])
 
-  const filteredServices = services.filter(service => {
-    const matchesSearch = service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         service.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = filterCategory === 'all' || service.category === filterCategory
-    return matchesSearch && matchesCategory
-  })
-
-  const toggleServiceStatus = (serviceId: string) => {
-    setServices(prev => prev.map(service =>
-      service.id === serviceId 
-        ? { ...service, isActive: !service.isActive }
-        : service
-    ))
+  const fetchServices = async () => {
+    try {
+      const response = await fetch('/api/services')
+      if (response.ok) {
+        const data = await response.json()
+        setServices(data.services || [])
+      }
+    } catch (error) {
+      console.error('Error fetching services:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const deleteService = (serviceId: string) => {
-    setServices(prev => prev.filter(service => service.id !== serviceId))
+  const handleDeleteService = async (serviceId: string) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar este servicio?')) return
+
+    try {
+      const response = await fetch(`/api/services/${serviceId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        setServices(services.filter(service => service.id !== serviceId))
+      }
+    } catch (error) {
+      console.error('Error deleting service:', error)
+    }
   }
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP'
-    }).format(price)
+  const handleToggleStatus = async (serviceId: string, currentStatus: boolean) => {
+    try {
+      const response = await fetch(`/api/services/${serviceId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ isActive: !currentStatus })
+      })
+
+      if (response.ok) {
+        setServices(services.map(service => 
+          service.id === serviceId 
+            ? { ...service, isActive: !currentStatus }
+            : service
+        ))
+      }
+    } catch (error) {
+      console.error('Error updating service status:', error)
+    }
   }
 
-  const formatDuration = (minutes: number) => {
-    return `${minutes} min`
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center">Cargando servicios...</div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle>Servicios</CardTitle>
-            <CardDescription>
-              Gestiona los servicios que ofrece tu negocio
-            </CardDescription>
-          </div>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Nuevo Servicio
-          </Button>
-        </div>
-
-        {/* Filtros y Búsqueda */}
-        <div className="flex flex-col sm:flex-row gap-4 mt-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-            <Input
-              placeholder="Buscar servicios..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
-          >
-            {categories.map(category => (
-              <option key={category} value={category}>
-                {category === 'all' ? 'Todas las categorías' : category}
-              </option>
-            ))}
-          </select>
-        </div>
+        <CardTitle>Lista de Servicios</CardTitle>
+        <CardDescription>
+          {services.length} servicio(s) configurado(s) en tu negocio
+        </CardDescription>
       </CardHeader>
-
       <CardContent>
-        <div className="space-y-4">
-          {filteredServices.map((service) => (
-            <div key={service.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors">
-              <div className="flex items-center space-x-4 flex-1">
-                <div className="flex-shrink-0 w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
-                  <DollarSign className="h-6 w-6 text-slate-600" />
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <h3 className="font-semibold text-lg">{service.name}</h3>
+        {services.length === 0 ? (
+          <div className="text-center py-8 text-slate-500">
+            <p>No hay servicios configurados</p>
+            <p className="text-sm mt-2">Crea tu primer servicio para empezar a recibir citas</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {services.map((service) => (
+              <div key={service.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3">
+                    <h3 className="font-semibold">{service.name}</h3>
                     <Badge variant={service.isActive ? "default" : "secondary"}>
                       {service.isActive ? 'Activo' : 'Inactivo'}
                     </Badge>
-                    <Badge variant="outline">{service.category}</Badge>
+                    {service.category && (
+                      <Badge variant="outline">{service.category}</Badge>
+                    )}
                   </div>
-                  
-                  <p className="text-sm text-slate-600 mb-2">{service.description}</p>
-                  
-                  <div className="flex items-center space-x-4 text-sm text-slate-500">
-                    <div className="flex items-center space-x-1">
-                      <Clock className="h-4 w-4" />
-                      <span>{formatDuration(service.duration)}</span>
+                  <p className="text-sm text-slate-600 mt-1">{service.description}</p>
+                  <div className="flex items-center space-x-4 mt-2 text-sm text-slate-500">
+                    <div className="flex items-center">
+                      <Clock className="h-4 w-4 mr-1" />
+                      {service.duration} min
                     </div>
-                    <div className="flex items-center space-x-1">
-                      <DollarSign className="h-4 w-4" />
-                      <span>{formatPrice(service.price)}</span>
+                    <div className="flex items-center">
+                      <DollarSign className="h-4 w-4 mr-1" />
+                      ${service.price.toLocaleString()}
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 w-8 p-0">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
-                    Editar Servicio
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => toggleServiceStatus(service.id)}>
-                    {service.isActive ? 'Desactivar' : 'Activar'}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => deleteService(service.id)}
-                    className="text-red-600"
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onEditService?.(service)}
                   >
-                    Eliminar
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          ))}
-
-          {filteredServices.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-slate-500">No se encontraron servicios</p>
-              <Button variant="outline" className="mt-2">
-                <Plus className="mr-2 h-4 w-4" />
-                Crear primer servicio
-              </Button>
-            </div>
-          )}
-        </div>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleToggleStatus(service.id, service.isActive)}
+                  >
+                    {service.isActive ? 'Desactivar' : 'Activar'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteService(service.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   )

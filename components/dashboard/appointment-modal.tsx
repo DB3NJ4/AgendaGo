@@ -1,12 +1,20 @@
+// components/dashboard/appointment-modal.tsx (actualizado)
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+
+interface Service {
+  id: string
+  name: string
+  duration: number
+  price: number
+}
 
 interface AppointmentModalProps {
   isOpen: boolean
@@ -15,32 +23,81 @@ interface AppointmentModalProps {
 }
 
 export function AppointmentModal({ isOpen, onClose, selectedDate }: AppointmentModalProps) {
+  const [services, setServices] = useState<Service[]>([])
+  const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     customerName: "",
     customerPhone: "",
     customerEmail: "",
-    service: "",
+    serviceId: "",
     date: selectedDate?.toISOString().split("T")[0] || "",
     time: "",
     notes: ""
   })
 
-  const services = [
-    { id: "1", name: "Corte de pelo", duration: 30, price: 15000 },
-    { id: "2", name: "Arreglo de barba", duration: 20, price: 8000 },
-    { id: "3", name: "Corte y barba", duration: 45, price: 20000 },
-    { id: "4", name: "Afeitado clásico", duration: 25, price: 12000 }
-  ]
-
+  // Generar horarios disponibles
   const timeSlots = [
     "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
     "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00"
   ]
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (isOpen) {
+      fetchServices()
+    }
+  }, [isOpen])
+
+  const fetchServices = async () => {
+    try {
+      const response = await fetch('/api/services')
+      if (response.ok) {
+        const data = await response.json()
+        setServices(data.services || [])
+      }
+    } catch (error) {
+      console.error('Error fetching services:', error)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Nueva cita:", formData)
-    onClose()
+    setLoading(true)
+
+    try {
+      // Combinar fecha y hora
+      const appointmentDateTime = new Date(`${formData.date}T${formData.time}`)
+
+      const response = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerName: formData.customerName,
+          customerPhone: formData.customerPhone,
+          customerEmail: formData.customerEmail,
+          serviceId: formData.serviceId,
+          appointmentDate: appointmentDateTime.toISOString(),
+          notes: formData.notes
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error creando cita')
+      }
+
+      onClose()
+      // Recargar la página para actualizar la lista
+      window.location.reload()
+      
+    } catch (error) {
+      console.error('Error creating appointment:', error)
+      alert(error instanceof Error ? error.message : 'Error creando cita')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -86,14 +143,14 @@ export function AppointmentModal({ isOpen, onClose, selectedDate }: AppointmentM
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="service">Servicio *</Label>
-              <Select value={formData.service} onValueChange={(value) => setFormData({ ...formData, service: value })}>
+              <Select value={formData.serviceId} onValueChange={(value) => setFormData({ ...formData, serviceId: value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona un servicio" />
                 </SelectTrigger>
                 <SelectContent>
                   {services.map((service) => (
                     <SelectItem key={service.id} value={service.id}>
-                      {service.name} - ${service.price.toLocaleString()}
+                      {service.name} - ${service.price.toLocaleString()} ({service.duration} min)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -142,8 +199,8 @@ export function AppointmentModal({ isOpen, onClose, selectedDate }: AppointmentM
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit">
-              Agendar Cita
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Agendando...' : 'Agendar Cita'}
             </Button>
           </DialogFooter>
         </form>
