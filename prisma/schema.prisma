@@ -89,6 +89,10 @@ model Appointment {
   customerName    String
   customerEmail   String?
   customerPhone   String
+  reminderSentAt   DateTime?
+  confirmedAt      DateTime?
+  cancelledAt      DateTime?
+  cancellationReason String?
   appointmentDate DateTime
   duration        Int      // en minutos
   status          String   @default("pending") // pending, confirmed, cancelled, completed

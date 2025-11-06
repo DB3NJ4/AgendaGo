@@ -1,4 +1,3 @@
-// app/booking/cancel/[appointmentId]/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -23,21 +22,24 @@ export default function CancelPage() {
           },
         })
 
+        const result = await response.json()
+        
+        console.log('📨 Respuesta del servidor:', result)
+
         if (response.ok) {
           setSuccess(true)
           console.log('✅ Cita cancelada exitosamente')
         } else {
-          const errorData = await response.json()
-          setError(errorData.error || 'Error cancelando la cita')
-          console.error('❌ Error cancelando:', errorData)
+          setError(result.error || 'Error cancelando la cita')
+          console.error('❌ Error cancelando:', result.error)
         }
-      } catch (error) {
-        setError('Error de conexión')
-        console.error('💥 Error:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
+      }  catch (error) {
+            console.error('💥 Error de conexión completo:', error)
+            setError('Error de conexión con el servidor. Por favor intenta nuevamente.')
+          } finally {
+            setLoading(false)
+          }
+        }
 
     if (appointmentId) {
       cancelAppointment()
